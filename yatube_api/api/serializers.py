@@ -1,60 +1,50 @@
+from rest_framework import serializers
+from .models import Post, Group, Comment, Follow
 from django.contrib.auth import get_user_model
-from rest_framework import serializers, validators
-from rest_framework.relations import SlugRelatedField
-from posts.models import Comment, Post, Group, Follow
 
-
+# Сериализатор для модели Post (посты)
 class PostSerializer(serializers.ModelSerializer):
-    author = SlugRelatedField(slug_field='username', read_only=True)
+    # Сериализуем связанные объекты User и Group
+    author = serializers.StringRelatedField(read_only=True)
+    group = serializers.SlugRelatedField(slug_field='title', queryset=Group.objects.all(), required=False)
 
     class Meta:
-        fields = '__all__'
         model = Post
+        fields = ('id', 'text', 'created', 'author', 'group')  # Определяем поля, которые будут включены в сериализованный объект
 
-
-class CommentSerializer(serializers.ModelSerializer):
-    author = serializers.SlugRelatedField(
-        read_only=True, slug_field='username'
-    )
-
-    class Meta:
-        fields = '__all__'
-        read_only_fields = ('post',)
-        model = Comment
-
-
+# Сериализатор для модели Group (группы)
 class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
-        fields = ('id', 'title', 'slug', 'description')
-        read_only_fields = ('id', 'title', 'slug', 'description')
+        fields = ('id', 'title', 'slug', 'description')  # Поля для группы
 
+# Сериализатор для модели Comment (комментарии)
+class CommentSerializer(serializers.ModelSerializer):
+    # Привязка комментария к автору
+    author = serializers.StringRelatedField(read_only=True)
+    
+    class Meta:
+        model = Comment
+        fields = ('id', 'text', 'created', 'author', 'post')  # Определяем поля, которые будут включены в сериализованный объект
 
+# Сериализатор для модели Follow (подписки)
 class FollowSerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(
-        slug_field='username',
-        queryset=get_user_model().objects.all(),
-        default=serializers.CurrentUserDefault()
-    )
-    following = serializers.SlugRelatedField(
-        slug_field='username',
-        queryset=get_user_model().objects.all()
-    )
-
+    # Указываем авторов и пользователя, который подписан
+    user = serializers.StringRelatedField(read_only=True)
+    following = serializers.StringRelatedField(read_only=True)
+    
     class Meta:
         model = Follow
-        fields = ('user', 'following')
-        validators = (
-            validators.UniqueTogetherValidator(
-                queryset=Follow.objects.all(),
-                fields=('user', 'following'),
-                message=('Подписка уже существует')
-            ),
-        )
+        fields = ('id', 'user', 'following')  # Поля для подписки
 
-    def validate(self, data):
-        if data['user'] == data['following']:
-            raise serializers.ValidationError(
-                'Попытка подписаться на себя же'
-            )
-        return data
+# Сериализатор для создания постов (посты без ID)
+class PostCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ('text', 'group')  # Только текст и группа
+
+# Сериализатор для отображения информации о пользователях
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()  # Используем стандартную модель пользователя Django
+        fields = ('username', 'email', 'first_name', 'last_name')  # Поля пользователя
